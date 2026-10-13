@@ -16,7 +16,7 @@ import pyrogram.raw.types
 # ==========================================
 # ⚙️ CONFIGURATION & ADMIN SETUP
 # ==========================================
-MASTER_TOKEN = '8820486567:AAFekkxdjJJbCXk-n38itK76HYd0rAt7cpk'
+MASTER_TOKEN = '8944209191:AAFiux-ARw9u4XPunJSgtpDzg_sGJbxbsgc'
 MASTER_ADMIN_ID = 5226497299
 CONTACT_USERNAME = "TEAM_101_HELP"
 API_ID = 31776585
