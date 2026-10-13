@@ -14,7 +14,7 @@ from pyrogram.raw.types import UpdateGroupCallParticipants
 # ==========================================
 # ⚙️ CONFIGURATION & ADMIN SETUP
 # ==========================================
-MASTER_TOKEN = '8820486567:AAFekkxdjJJbCXk-n38itK76HYd0rAt7cpk'
+MASTER_TOKEN = '8944209191:AAHFqTScbBY7p9kXmivnrdDiLHt-l22Cgew'
 MASTER_ADMIN_ID = 5226497299
 CONTACT_USERNAME = "TEAM_101_HELP"
 API_ID = 31776585
