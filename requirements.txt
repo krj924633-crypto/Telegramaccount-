@@ -1,3 +1,6 @@
 telethon
 python-socks
 PySocks
+pyTelegramBotAPI
+pyrogram
+tgcrypto
