@@ -16,27 +16,25 @@ import pyrogram.raw.types
 # ==========================================
 # ⚙️ CONFIGURATION & ADMIN SETUP
 # ==========================================
-MASTER_TOKEN = '8944209191:AAFiux-ARw9u4XPunJSgtpDzg_sGJbxbsgc'
+MASTER_TOKEN = '8944209191:AAFbGFlMNtHolucljeqg0kaGNierL17l8W0'
 MASTER_ADMIN_ID = 5226497299
 CONTACT_USERNAME = "TEAM_101_HELP"
 API_ID = 31776585
 API_HASH = "38ef078842d8db1752b87ca4deabab9d"
 
 # ==========================================
-# 🛠️ PERMANENT BACKGROUND ENGINE (PYROGRAM)
+# 🛠️ FIXED ASYNC ENGINE FOR RENDER
 # ==========================================
-_pyrogram_loop = asyncio.new_event_loop()
-active_engagement_clients = [] # BUG 1 FIX: Live stream joiners ko zinda rakhne ke liye
-
-def start_pyrogram_loop(loop):
-    asyncio.set_event_loop(loop)
-    loop.run_forever()
-
-threading.Thread(target=start_pyrogram_loop, args=(_pyrogram_loop,), daemon=True).start()
+active_engagement_clients = []
 
 def run_async(coro):
-    future = asyncio.run_coroutine_threadsafe(coro, _pyrogram_loop)
-    return future.result()
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            return asyncio.run_coroutine_threadsafe(coro, loop).result()
+    except Exception:
+        pass
+    return asyncio.run(coro)
 
 # ==========================================
 # 🛠️ DATABASE SETUP (UNIFIED + SAAS)
@@ -73,7 +71,6 @@ def init_db():
     except: pass
     try: cursor.execute("ALTER TABLE owners ADD COLUMN btn_3 TEXT")
     except: pass
-    # NEW: Engagement Features Columns
     try: cursor.execute("ALTER TABLE owners ADD COLUMN eng_expiry INTEGER DEFAULT 0")
     except: pass
     try: cursor.execute("ALTER TABLE owners ADD COLUMN eng_target TEXT")
@@ -103,7 +100,6 @@ def init_db():
     try: cursor.execute("ALTER TABLE clone_bots ADD COLUMN features TEXT")
     except: pass
 
-    # NEW: Global Fake Accounts Table
     cursor.execute('''CREATE TABLE IF NOT EXISTS fake_accounts (
                         phone TEXT PRIMARY KEY,
                         session_string TEXT
@@ -477,7 +473,7 @@ def run_bot_instance(bot_token, IS_MASTER=False):
             else:
                 expiry = int(now) + 2592000
                 if not data: cursor.execute("INSERT INTO owners (owner_id, uc_expiry) VALUES (?, ?)", (target_id, expiry))
-                else: cursor.execute("UPDATE owners SET uc_expiry = ? WHERE owner_id = ?", (expiry, target_id))
+                else: cursor.execute("UPDATE owners SET uc_expiry = ?, reminder_sent = 0 WHERE owner_id = ?", (expiry, target_id))
                 status = "ON 🟢"
             conn.commit()
             conn.close()
@@ -498,8 +494,8 @@ def run_bot_instance(bot_token, IS_MASTER=False):
                 status = "OFF 🔴"
             else:
                 expiry = int(now) + 2592000
-                if not data: cursor.execute("INSERT INTO owners (owner_id, rp_expiry) VALUES (?, ?)", (target_id, expiry))
-                else: cursor.execute("UPDATE owners SET rp_expiry = ? WHERE owner_id = ?", (expiry, target_id))
+                if not data: cursor.execute("INSERT INTO owners (owner_id, rp_expiry, reminder_sent) VALUES (?, ?, 0)", (target_id, expiry))
+                else: cursor.execute("UPDATE owners SET rp_expiry = ?, reminder_sent = 0 WHERE owner_id = ?", (expiry, target_id))
                 status = "ON 🟢"
             conn.commit()
             conn.close()
@@ -741,7 +737,7 @@ def run_bot_instance(bot_token, IS_MASTER=False):
                     except: pass
                     
                     chat = await client.get_chat(target_link)
-                    is_live_joined = False # BUG 1 FIX (Live Hold Logic)
+                    is_live_joined = False 
                     
                     if action in ["eng_views", "eng_all", "eng_react"]:
                         async for msg in client.get_chat_history(chat.id, limit=3):
@@ -760,15 +756,15 @@ def run_bot_instance(bot_token, IS_MASTER=False):
                                     join_as=peer,
                                     params=pyrogram.raw.types.DataJSON(data="{}")
                                 ))
-                                active_engagement_clients.append(client) # Client ko memory me save kiya taaki live se leave na ho
+                                active_engagement_clients.append(client)
                                 is_live_joined = True
                         except Exception: pass
                         
                     if not is_live_joined:
-                        await client.stop() # Sirf tabhi disconnect karega jab Live me join nahi hua ho
+                        await client.stop()
                         
                     success += 1
-                    await asyncio.sleep(2) # Safe 2 sec delay per account
+                    await asyncio.sleep(2) 
                 except Exception: pass
             return success
 
@@ -1284,8 +1280,8 @@ def run_bot_instance(bot_token, IS_MASTER=False):
 # 🧹 BACKGROUND AUTO-SCANNER & LIVE BOUNCER
 # ==========================================
 def background_workers():
-    worker_loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(worker_loop)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     
     active_bouncers = {}
     
@@ -1295,7 +1291,6 @@ def background_workers():
             cursor = conn.cursor()
             now = int(time.time())
             
-            # --- 1. BOUNCER SYSTEM (PREMIUM REMOVE) ---
             cursor.execute("SELECT owner_id, channel_uid, session_string FROM premium_customers WHERE expiry_date > ? AND session_string IS NOT NULL", (now,))
             pr_customers = cursor.fetchall()
             
@@ -1333,19 +1328,6 @@ def background_workers():
                         active_bouncers[owner_id] = client
                     except Exception: pass
 
-            # --- BUG 2 FIX: 24/7 AUTO ENGAGEMENT SCANNER ---
-            cursor.execute("SELECT owner_id, eng_target FROM owners WHERE eng_all_time = 1 AND eng_expiry > ? AND eng_target IS NOT NULL", (now,))
-            auto_eng_users = cursor.fetchall()
-            
-            cursor.execute("SELECT session_string FROM fake_accounts")
-            fake_sessions = cursor.fetchall()
-            
-            if auto_eng_users and fake_sessions:
-                # Agar kisi ne 24/7 chalu rakha hai, toh scout un channels par nazar rakhega.
-                # (Render ke limit ke kaaran ye loop dheere-dheere background me chalega)
-                pass # Safe memory footprint mode
-                
-            # Background Sweeper (Night Clean)
             current_hour = datetime.datetime.now().hour
             if current_hour >= 6:
                 cursor.execute("SELECT user_id FROM vip_users")
@@ -1375,7 +1357,7 @@ def background_workers():
             conn.close()
             await asyncio.sleep(300) 
             
-    worker_loop.run_until_complete(main_manager())
+    loop.run_until_complete(main_manager())
 
 threading.Thread(target=background_workers, daemon=True).start()
 
